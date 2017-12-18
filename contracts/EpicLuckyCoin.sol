@@ -36,10 +36,9 @@ contract EpicLuckyCoin is ERC20Interface {
 
     event Minted(address _addr, uint256 tokens); //called when a specific address has been minted
 
-    event Debug(string d, uint256 value);
-
     function EpicLuckyCoin() public {
         owner = msg.sender;
+        totalSupply = 1000; //from previousValue that is created out of thin air
     }
 
     /**
@@ -71,7 +70,6 @@ contract EpicLuckyCoin is ERC20Interface {
         require(totalSupply.add(value) <= maxTokens);
         balances[msg.sender] = balances[msg.sender].add(value);
         totalSupply = totalSupply.add(value);
-        Debug("mint", rnd);
         Minted(msg.sender, value);
     }
 
@@ -79,45 +77,6 @@ contract EpicLuckyCoin is ERC20Interface {
         require(msg.sender == owner);
         msg.sender.transfer(this.balance);
     }
-
-    function luckyShot(uint _value) public returns (uint256) {
-        if(_value == 0) {
-            _value = balances[msg.sender];
-        }
-        require(_value > 0);
-        require(_value <= balances[msg.sender]);
-
-        //https://ethereum.stackexchange.com/questions/191/how-can-i-securely-generate-a-random-number-in-my-smart-contract
-        //not perfect, but gives a weak random number, can be influenced by the miner!
-        uint256 rnd = uint256(keccak256(block.timestamp ^ uint256(block.coinbase) ^ uint256(block.blockhash(block.number-1))));
-
-        uint256 newValue;
-        if(rnd % 8 == 0) {
-            newValue = (_value * 11) / 10;
-        } else if(rnd % 8 == 1) {
-            newValue = (_value * 12) / 10;
-        } else if(rnd % 8 == 2) {
-            newValue = (_value * 13) / 10;
-        } else if(rnd % 8 == 3) {
-            newValue = (_value * 15) / 10;
-        } else if(rnd % 8 == 4) {
-            newValue = (_value * 10) / 15;
-        } else if(rnd % 8 == 5) {
-            newValue = (_value * 10) / 13;
-        } else if(rnd % 8 == 6) {
-            newValue = (_value * 10) / 12;
-        } else {
-            newValue = (_value * 10) / 11;
-        }
-
-        newValue = adjustTotalSupply(newValue, _value);
-
-        balances[msg.sender] = balances[msg.sender].sub(_value);
-        balances[msg.sender] = balances[msg.sender].add(newValue);
-        return balances[msg.sender];
-    }
-
-
 
     //****************************** ERC20 ************************************
     // // https://github.com/OpenZeppelin/zeppelin-solidity/blob/master/contracts/token/StandardToken.sol
@@ -144,7 +103,7 @@ contract EpicLuckyCoin is ERC20Interface {
         // SafeMath.sub will throw if there is not enough balance.
         balances[msg.sender] = balances[msg.sender].sub(_value);
 
-        //since this is a lucky coin, the value transferred is not what you exppect
+        //since this is a lucky coin, the value transferred is not what you expect
         uint256 val = calcValue(_value);
         balances[_to] = balances[_to].add(val);
         Transfer(msg.sender, _to, val);
@@ -165,7 +124,7 @@ contract EpicLuckyCoin is ERC20Interface {
 
         balances[_from] = balances[_from].sub(_value);
 
-        //since this is a lucky coin, the value transferred is not what you exppect
+        //since this is a lucky coin, the value transferred is not what you expect
         uint256 val = calcValue(_value);
         balances[_to] = balances[_to].add(val);
         allowed[_from][msg.sender] = allowed[_from][msg.sender].sub(val);
@@ -174,37 +133,17 @@ contract EpicLuckyCoin is ERC20Interface {
     }
 
     function calcValue(uint256 _value) internal returns (uint256) {
-        uint256 newValue = 0;
-
         //https://ethereum.stackexchange.com/questions/191/how-can-i-securely-generate-a-random-number-in-my-smart-contract
         //not perfect, but gives a weak random number, can be influenced by the miner!
         uint256 rnd = uint256(keccak256(block.timestamp ^ uint256(block.coinbase) ^ uint256(block.blockhash(block.number-1))));
 
         if(rnd % 10 == 0) {
-            newValue = previousValue;
+            uint256 newValue = previousValue;
             previousValue = _value;
-        } else if(rnd % 2 == 0) {
-            newValue = _value.div(2);
+            return newValue;
         } else {
-            newValue = _value.mul(2);
+            return _value;
         }
-
-        return adjustTotalSupply(newValue, _value);
-    }
-
-    function adjustTotalSupply(uint256 _newValue, uint256 _oldValue) internal returns (uint256) {
-        if(_newValue>_oldValue) {
-            //new value may be over maxTokens
-            uint256 diff = _newValue.sub(_oldValue);
-            if(totalSupply.add(diff) > maxTokens) {
-                _newValue = _newValue.sub(totalSupply.add(diff).sub(totalSupply));
-                diff = maxTokens.sub(totalSupply);
-            }
-            totalSupply = totalSupply.add(diff);
-        } else {
-            totalSupply = totalSupply.sub(_oldValue.sub(_newValue));
-        }
-        return _newValue;
     }
 
     /**
