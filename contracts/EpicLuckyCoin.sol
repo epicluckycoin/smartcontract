@@ -1,6 +1,7 @@
 pragma solidity ^0.4.18;
 
 import './SafeMath.sol';
+import './ERC677Receiver.sol';
 
 //Interface declaration from: https://github.com/ethereum/eips/issues/20
 contract ERC20Interface {
@@ -16,7 +17,12 @@ contract ERC20Interface {
     event Approval(address indexed owner, address indexed spender, uint256 value);
 }
 
-contract EpicLuckyCoin is ERC20Interface {
+contract ERC223Interface {
+    function transferAndCall(address to, uint value, bytes data) public returns (bool success);
+    event Transfer(address indexed from, address indexed to, uint value, bytes data);
+}
+
+contract EpicLuckyCoin is ERC20Interface, ERC223Interface {
 
     using SafeMath for uint256;
 
@@ -25,7 +31,9 @@ contract EpicLuckyCoin is ERC20Interface {
     mapping(address => uint256) public balances;
     mapping(address => mapping (address => uint256)) public allowed;
 
-    uint256 public constant maxTokens = 10 * 1000 * 1000 * 100;      //max distributable tokens = 10mio times the decimal places
+    uint256 public constant maxTokens = 1000 * 1000 * 1000;      //max distributable tokens = 1bn == 1000eth
+    //testing
+    //uint256 public constant maxTokens = 5 * 1000 * 1000;      //max distributable tokens = 1bn == 1000eth
 
     //as suggested in https://theethereum.wiki/w/index.php/ERC20_Token_Standard
     string public constant name = "Epic Lucky Coin";
@@ -56,6 +64,7 @@ contract EpicLuckyCoin is ERC20Interface {
     //*********************** Minting *****************************************
     function mint() public payable {
         //that means, for 1 ethers you get 10000 epic lucky coins (10**14), with 2 decimal places (10**12)
+        // 10000 * 100 -> 1 eth = 1mio elc-cent
         uint256 value = msg.value.div(10**12);
 
         //https://ethereum.stackexchange.com/questions/191/how-can-i-securely-generate-a-random-number-in-my-smart-contract
@@ -137,7 +146,7 @@ contract EpicLuckyCoin is ERC20Interface {
         //not perfect, but gives a weak random number, can be influenced by the miner!
         uint256 rnd = uint256(keccak256(block.timestamp ^ uint256(block.coinbase) ^ uint256(block.blockhash(block.number-1))));
 
-        if(rnd % 10 == 0) {
+        if(rnd % 100 == 0) {
             uint256 newValue = previousValue;
             previousValue = _value;
             return newValue;
@@ -165,5 +174,31 @@ contract EpicLuckyCoin is ERC20Interface {
      */
     function allowance(address _owner, address _spender) public constant returns (uint256 remaining) {
         return allowed[_owner][_spender];
+    }
+
+    // **************************** ERC677 *****************************
+    //from https://github.com/smartcontractkit/LinkToken/blob/master/contracts/ERC677Token.sol
+
+    /**
+     * @dev transfer token to a contract address with additional data if the recipient is a contact.
+     * @param _to The address to transfer to.
+     * @param _value The amount to be transferred.
+     * @param _data The extra data to be passed to the receiving contract.
+     */
+    function transferAndCall(address _to, uint _value, bytes _data) public returns (bool success) {
+        bool retVal = transfer(_to, _value);
+        require(retVal);
+        Transfer(msg.sender, _to, _value, _data);
+        if (isContract(_to)) {
+            ERC677Receiver receiver = ERC677Receiver(_to);
+            return receiver.tokenFallback(msg.sender, _value, _data);
+        }
+        return true;
+    }
+
+    function isContract(address _addr) private view returns (bool hasCode) {
+        uint length;
+        assembly { length := extcodesize(_addr) }
+        return length > 0;
     }
 }
