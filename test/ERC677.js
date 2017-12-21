@@ -9,9 +9,9 @@ contract('EpicLuckyCoin', (accounts) => {
 
     beforeEach(async () => {
         receiver = await Token677ReceiverMock.new();
-        sender = Accounts[0];
+        sender = accounts[0];
         token = await EpicLuckyCoin.new();
-        await token.mint({value:web3.toWei(1,"ether")});
+        await token.sendTransaction({from: sender, value: web3.toWei(1,"ether")});
         transferAmount = 100;
 
         await token.transfer(sender, transferAmount);
@@ -43,7 +43,7 @@ contract('EpicLuckyCoin', (accounts) => {
             await sendTransaction(params);
 
             balance = await token.balanceOf(receiver.address);
-            assert.equal(balance.toString(), transferAmount.toString());
+            assert.equal(balance.add(10).toString(), transferAmount.toString());
         });
 
         it("calls the token fallback function on transfer", async () => {

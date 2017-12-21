@@ -33,20 +33,26 @@ contract EpicLuckyCoin is ERC20Interface, ERC223Interface {
 
     uint256 public constant maxTokens = 1000 * 1000 * 1000;      //max distributable tokens = 1bn == 1000eth
     //testing
-    //uint256 public constant maxTokens = 5 * 1000 * 1000;      //max distributable tokens = 1bn == 1000eth
+    //uint256 public constant maxTokens = 5 * 1000 * 1000;      //max distributable tokens = 5eth for testing
 
     //as suggested in https://theethereum.wiki/w/index.php/ERC20_Token_Standard
     string public constant name = "Epic Lucky Coin";
     string public constant symbol = "ELC";
     uint8 public constant decimals = 2;
 
-    uint256 public previousValue = 1000;
+    uint256 public pot = 0;
 
-    event Minted(address _addr, uint256 tokens); //called when a specific address has been minted
+    address public previousMintAddress = address(0);
+    uint256 public previousMintBlockNr = 0;
+    uint256 public previousMintValue = 0;
+
+    address public previousTransferAddress = address(0);
+    uint256 public previousTransferBlockNr = 0;
+
+    event Minted(address owner, int256 value); //called when a specific address has been minted
 
     function EpicLuckyCoin() public {
         owner = msg.sender;
-        totalSupply = 1000; //from previousValue that is created out of thin air
     }
 
     /**
@@ -62,24 +68,70 @@ contract EpicLuckyCoin is ERC20Interface, ERC223Interface {
     }
 
     //*********************** Minting *****************************************
-    function mint() public payable {
+    function() public payable {
+        require(msg.value > 0);
         //that means, for 1 ethers you get 10000 epic lucky coins (10**14), with 2 decimal places (10**12)
         // 10000 * 100 -> 1 eth = 1mio elc-cent
         uint256 value = msg.value.div(10**12);
 
-        //https://ethereum.stackexchange.com/questions/191/how-can-i-securely-generate-a-random-number-in-my-smart-contract
-        //not perfect, but gives a weak random number, can be influenced by the miner!
-        uint256 rnd = uint256(keccak256(block.timestamp ^ uint256(block.coinbase) ^ uint256(block.blockhash(block.number-1))));
-        if(rnd % 2 == 0) {
-            value = value.div(2);
-        } else {
-            value = value.mul(2);
-        }
+        luckyTransfer();
+        luckyMint();
+        previousMintBlockNr = block.number;
+        previousMintAddress = msg.sender;
+        previousMintValue = value;
+
         // https://ethereum.stackexchange.com/questions/2428/does-throw-refund-the-ether-value
         require(totalSupply.add(value) <= maxTokens);
         balances[msg.sender] = balances[msg.sender].add(value);
         totalSupply = totalSupply.add(value);
-        Minted(msg.sender, value);
+        Minted(msg.sender, int256(value));
+    }
+
+    function luckyMint() private {
+        if(block.number != previousMintBlockNr && (block.number - previousMintBlockNr) < 256 ) {
+            //https://ethereum.stackexchange.com/questions/191/how-can-i-securely-generate-a-random-number-in-my-smart-contract
+            //not perfect, but gives a weak random number, can be influenced by the miner!
+            //go random for the previous minter!
+            uint256 rnd = uint256(keccak256(block.blockhash(previousMintBlockNr)));
+            uint256 val = previousMintValue.div(2); // half of the previous payin value
+            if(rnd % 2 == 0) { //bad luck!, deduct half of previous value
+                if(balances[previousMintAddress] >= val) {
+                    balances[previousMintAddress] = balances[previousMintAddress].sub(val);
+                } else {
+                    val = balances[previousMintAddress];
+                    balances[previousMintAddress] = 0;
+                }
+                totalSupply = totalSupply.sub(val);
+                Minted(previousMintAddress, -int256(val));
+            } else { //lucky you!, add half
+                if(totalSupply.add(val) > maxTokens) {
+                    val = maxTokens.sub(totalSupply);
+                }
+                balances[previousMintAddress] = balances[previousMintAddress].add(val);
+                totalSupply = totalSupply.add(val);
+                Minted(previousMintAddress, int256(val));
+            }
+            previousMintBlockNr = 0;
+            previousMintAddress = 0;
+            previousMintValue = 0;
+        }
+    }
+
+    function luckyTransfer() private {
+        if(block.number != previousTransferBlockNr && (block.number - previousTransferBlockNr) < 256 ) {
+            //https://ethereum.stackexchange.com/questions/191/how-can-i-securely-generate-a-random-number-in-my-smart-contract
+            //not perfect, but gives a weak random number, can be influenced by the miner!
+            //go random for the previous minter!
+            uint256 rnd = uint256(keccak256(block.blockhash(previousTransferBlockNr)));
+            if(rnd % 200 == 0) { //.5% chance -> reward ~2000Tokens ~0.2ETH, which is way below 5ETH.
+                balances[previousTransferAddress] = balances[previousTransferAddress].add(pot);
+                Transfer(this, previousTransferAddress, pot);
+                //tokens are from pot, thus no tokens are created from thin air
+                pot = 0;
+                previousTransferBlockNr = 0;
+                previousTransferAddress = 0;
+            }
+        }
     }
 
     function payout() public { //to support further lucky coins
@@ -108,14 +160,23 @@ contract EpicLuckyCoin is ERC20Interface, ERC223Interface {
 
         require(_to != address(0));
         require(_value <= balances[msg.sender]);
+        require(_value >= 10);
 
         // SafeMath.sub will throw if there is not enough balance.
         balances[msg.sender] = balances[msg.sender].sub(_value);
 
         //since this is a lucky coin, the value transferred is not what you expect
-        uint256 val = calcValue(_value);
+        luckyMint();
+        luckyTransfer();
+        previousTransferBlockNr = block.number;
+        previousTransferAddress = msg.sender;
+
+        //in any case add 10 to the pot
+        uint256 val = _value.sub(10);
+        pot = pot.add(10);
         balances[_to] = balances[_to].add(val);
         Transfer(msg.sender, _to, val);
+
         return true;
     }
 
@@ -130,29 +191,23 @@ contract EpicLuckyCoin is ERC20Interface, ERC223Interface {
         require(_to != address(0));
         require(_value <= balances[_from]);
         require(_value <= allowed[_from][msg.sender]);
+        require(_value >= 10);
 
         balances[_from] = balances[_from].sub(_value);
 
         //since this is a lucky coin, the value transferred is not what you expect
-        uint256 val = calcValue(_value);
+        luckyMint();
+        luckyTransfer();
+        previousTransferBlockNr = block.number;
+        previousTransferAddress = msg.sender;
+
+        //in any case add 10 to the pot
+        uint256 val = _value.sub(10);
+        pot = pot.add(10);
         balances[_to] = balances[_to].add(val);
-        allowed[_from][msg.sender] = allowed[_from][msg.sender].sub(val);
+        allowed[_from][msg.sender] = allowed[_from][msg.sender].sub(_value); //subtract old value
         Transfer(_from, _to, val);
         return true;
-    }
-
-    function calcValue(uint256 _value) internal returns (uint256) {
-        //https://ethereum.stackexchange.com/questions/191/how-can-i-securely-generate-a-random-number-in-my-smart-contract
-        //not perfect, but gives a weak random number, can be influenced by the miner!
-        uint256 rnd = uint256(keccak256(block.timestamp ^ uint256(block.coinbase) ^ uint256(block.blockhash(block.number-1))));
-
-        if(rnd % 100 == 0) {
-            uint256 newValue = previousValue;
-            previousValue = _value;
-            return newValue;
-        } else {
-            return _value;
-        }
     }
 
     /**

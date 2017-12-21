@@ -3,7 +3,7 @@
 var EpicLuckyCoin = artifacts.require('./EpicLuckyCoin.sol')
 var utils = {
     testMint(contract, account, value) {
-        return contract.mint({from: account, value: value})
+        return contract.sendTransaction({from: account, value: value})
             .catch((err) => {
             console.log("mint error: "+err)
             throw new Error(err) });
@@ -18,11 +18,11 @@ var utils = {
         });
     },
     compare(value) {
-        return value == 2000000 || value == 500000;
+        return value == 1500000-10 || value == 500000-10;
     },
 
     compareDiff(value, diff) {
-        return value == 2000000 + diff || value == 500000 + diff;
+        return value == 1500000-10 + diff || value == 500000-10 + diff;
     },
 
 }
@@ -136,7 +136,7 @@ contract('EpicLuckyCoin', function (accounts) {
         }).then(function (result) {
             return contract.balanceOf.call(accounts[1])
         }).then(function (result) {
-            assert.strictEqual(result.toNumber(), 10000)
+            assert.strictEqual(result.toNumber(), 9990)
         }).catch((err) => {
             throw new Error(err)
         })
@@ -155,14 +155,16 @@ contract('EpicLuckyCoin', function (accounts) {
         })
     })
 
-    it('transfers: should not fail on zero-transfers', function () {
+    it('transfers: should fail on zero-transfers', function () {
         return EpicLuckyCoin.deployed().then(function (instance) {
             return utils.testMint(contract, accounts[0], web3.toWei(1,"ether"));
         }).then(function (result) {
             return contract.transfer.call(accounts[1], 0, {from: accounts[0]})
+        }).then(function (result) {
+            assert(false, 'The preceding call should have thrown an error.')
         }).catch((err) => {
-            throw new Error(err)
-        })
+            assert(evmThrewRevertError(err), 'the EVM did not throw an error or did not ' +
+                'throw the expected error:'+err)})
     })
 
     // NOTE: testing uint256 wrapping is impossible in this standard token since you can't supply > 2^256 -1.
@@ -190,7 +192,7 @@ contract('EpicLuckyCoin', function (accounts) {
         }).then(function (result) {
             return contract.balanceOf.call(accounts[0])
         }).then(function (result) {
-            assert.strictEqual(true, utils.compare(result.toNumber()))
+            assert.strictEqual(1000000, result.toNumber(), "result was:"+result);
             return contract.approve(accounts[1], 100, {from: accounts[0]})
         }).then(function (result) {
             return contract.balanceOf.call(accounts[2])
@@ -205,10 +207,10 @@ contract('EpicLuckyCoin', function (accounts) {
             assert.strictEqual(result.toNumber(), 80)
             return contract.balanceOf.call(accounts[2])
         }).then(function (result) {
-            assert.strictEqual(result.toNumber(), 20)
+            assert.strictEqual(result.toNumber(), 10)
             return contract.balanceOf.call(accounts[0])
         }).then(function (result) {
-            assert.strictEqual(true, utils.compareDiff(result.toNumber(), -20))
+            assert.strictEqual(true, utils.compareDiff(result.toNumber(), -10), "result was:"+result)
         }).catch((err) => {
             throw new Error(err)
         })
@@ -231,10 +233,10 @@ contract('EpicLuckyCoin', function (accounts) {
             assert.strictEqual(result.toNumber(), 80)
             return contract.balanceOf.call(accounts[2])
         }).then(function (result) {
-            assert.strictEqual(result.toNumber(), 20)
+            assert.strictEqual(result.toNumber(), 10)
             return contract.balanceOf.call(accounts[0])
         }).then(function (result) {
-            assert.strictEqual(true, utils.compareDiff(result.toNumber(), -20))
+            assert(true, utils.compareDiff(result.toNumber(), -10), "result:"+result)
             // FIRST tx done.
             // onto next.
             return contract.transferFrom(accounts[0], accounts[2], 20, {from: accounts[1]})
@@ -244,10 +246,10 @@ contract('EpicLuckyCoin', function (accounts) {
             assert.strictEqual(result.toNumber(), 60)
             return contract.balanceOf.call(accounts[2])
         }).then(function (result) {
-            assert.strictEqual(result.toNumber(), 40)
+            assert.strictEqual(result.toNumber(), 20)
             return contract.balanceOf.call(accounts[0])
         }).then(function (result) {
-            assert.strictEqual(true, utils.compareDiff(result.toNumber(), -40))
+            assert(true, utils.compareDiff(result.toNumber(), -20), "result:"+result);
         }).catch((err) => {
             throw new Error(err)
         })
@@ -270,10 +272,10 @@ contract('EpicLuckyCoin', function (accounts) {
             assert.strictEqual(result.toNumber(), 50)
             return contract.balanceOf.call(accounts[2])
         }).then(function (result) {
-            assert.strictEqual(result.toNumber(), 50)
+            assert.strictEqual(result.toNumber(), 40)
             return contract.balanceOf.call(accounts[0])
         }).then(function (result) {
-            assert.strictEqual(true, utils.compareDiff(result.toNumber(), -50))
+            assert(true, utils.compareDiff(result.toNumber(), -50), "result:"+result)
             // FIRST tx done.
             // onto next.
             return contract.transferFrom.call(accounts[0], accounts[2], 60, {from: accounts[1]})
@@ -338,9 +340,14 @@ contract('EpicLuckyCoin', function (accounts) {
         }).then(function (result) {
             return contract.transfer(accounts[1], '2666', {from: accounts[0]})
         }).then(function (result) {
-            assert.strictEqual(result.logs[0].args.from, accounts[0])
-            assert.strictEqual(result.logs[0].args.to, accounts[1])
-            assert.strictEqual(result.logs[0].args.value.toString(), '2666')
+
+            assert.strictEqual(result.logs[0].args.owner, accounts[0], "from:"+result.logs[0].args.owner)
+            var num = result.logs[0].args.value.toNumber();
+            assert.strictEqual(true, (num == -500000 || num == 500000))
+
+            assert.strictEqual(result.logs[1].args.from, accounts[0])
+            assert.strictEqual(result.logs[1].args.to, accounts[1])
+            assert.strictEqual(result.logs[1].args.value.toString(), '2656')
         }).catch((err) => {
             throw new Error(err)
         })
@@ -393,9 +400,18 @@ contract('EpicLuckyCoin', function (accounts) {
         }).then(function (result) {
             return contract.transferFrom(accounts[0], accounts[2], '2666', {from: accounts[1]})
         }).then(function (result) {
-            assert.strictEqual(result.logs[0].args.from, accounts[0])
-            assert.strictEqual(result.logs[0].args.to, accounts[2])
-            assert.strictEqual(result.logs[0].args.value.toString(), '2666')
+
+            /*assert.strictEqual(result.logs[0].args.owner, accounts[0], "owner:"+result.logs[0].args.owner)
+            assert.strictEqual(result.logs[0].args.spender, accounts[1], "spender:"+result.logs[0].args.spender)
+            assert.strictEqual(result.logs[0].args.value.toString(), '2666')*/
+
+            assert.strictEqual(result.logs[0].args.owner, accounts[0], "owner:"+result.logs[0].args.owner)
+            var num = result.logs[0].args.value.toNumber();
+            assert.strictEqual(true, (num == -500000 || num == 500000))
+
+            assert.strictEqual(result.logs[1].args.from, accounts[0], "from:"+result.logs[1].args.from)
+            assert.strictEqual(result.logs[1].args.to, accounts[2], "to:"+result.logs[1].args.to)
+            assert.strictEqual(result.logs[1].args.value.toString(), '2656')
         }).catch((err) => {
             throw new Error(err)
         })
