@@ -41,6 +41,7 @@ contract EpicLuckyCoin is ERC20Interface, ERC223Interface {
     uint8 public constant decimals = 2;
 
     uint256 public pot = 0;
+    uint256 public constant potIncrease = 10 * 100; //10 ELC * decimals
 
     address public previousMintAddress = address(0);
     uint256 public previousMintBlockNr = 0;
@@ -160,7 +161,7 @@ contract EpicLuckyCoin is ERC20Interface, ERC223Interface {
 
         require(_to != address(0));
         require(_value <= balances[msg.sender]);
-        require(_value >= 10);
+        require(_value >= potIncrease);
 
         // SafeMath.sub will throw if there is not enough balance.
         balances[msg.sender] = balances[msg.sender].sub(_value);
@@ -171,9 +172,9 @@ contract EpicLuckyCoin is ERC20Interface, ERC223Interface {
         previousTransferBlockNr = block.number;
         previousTransferAddress = msg.sender;
 
-        //in any case add 10 to the pot
-        uint256 val = _value.sub(10);
-        pot = pot.add(10);
+        //in any case add 10*1000 to the pot
+        uint256 val = _value.sub(potIncrease);
+        pot = pot.add(potIncrease);
         balances[_to] = balances[_to].add(val);
         Transfer(msg.sender, _to, val);
 
@@ -191,7 +192,7 @@ contract EpicLuckyCoin is ERC20Interface, ERC223Interface {
         require(_to != address(0));
         require(_value <= balances[_from]);
         require(_value <= allowed[_from][msg.sender]);
-        require(_value >= 10);
+        require(_value >= potIncrease);
 
         balances[_from] = balances[_from].sub(_value);
 
@@ -202,8 +203,8 @@ contract EpicLuckyCoin is ERC20Interface, ERC223Interface {
         previousTransferAddress = msg.sender;
 
         //in any case add 10 to the pot
-        uint256 val = _value.sub(10);
-        pot = pot.add(10);
+        uint256 val = _value.sub(potIncrease);
+        pot = pot.add(potIncrease);
         balances[_to] = balances[_to].add(val);
         allowed[_from][msg.sender] = allowed[_from][msg.sender].sub(_value); //subtract old value
         Transfer(_from, _to, val);

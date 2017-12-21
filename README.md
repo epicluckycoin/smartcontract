@@ -13,22 +13,27 @@ you get lucky, you may end up with more tokens than before.
 Here are the rules minting and transferring rules:
 
 ## Minting
-The exchange rate is 1 ETH = 10'000 ELC, however, with a 50%<sup>*</sup> change you get 20'000 ELC and if 
-you are unlucky, you get 5'000 ELC. For the randomness discussion, see below.
+The exchange rate is 1 ETH = 10'000 ELC, however, with a 50%<sup>*</sup> change you get 
+50% more and if you are unlucky, you get 50% less. E.g. if you buy/mint 1 ETH, you may 
+get 15'000 or 5'000 ELC. For the randomness discussion, see below.
 
 ## Coin Transfer
-If you transfer ELC from Alice to Bob, then with a 1% chance, you will transfer a previous
-amount. E.g., if Carol had send Bob 1000 ELC in the past and now Alice sends Bob 10 ELC, then
-with a 1% chance, Alice will be deducted 10 ELC, while Bob will received 1000 ELC.  
+If you transfer ELC from Alice to Bob, then with a 0.5% chance, you will transfer the pot 
+in addition. For every transaction 10 ELC coins goes to a pot, and it is expected that 
+every 0.5%, 2'000 ELC will be added to the a random transfer. E.g., if Alice sends 1000 ELC 
+to Bob, Alice will have 1'000 less, and Bob receives 990. However, with a 0.5% chance, 
+Bob will receive 2990 tokens instead only 990 tokens. For the randomness discussion, 
+see below.
  
 ## Why?
-This is a fun coin that was invented for a secret santa gift exchange purpose. The goal 
-was find a fun coin. Instead of finding a coin, I created a coin. If this coin should ever
-become popular, the funds will be used for further fun coins. This coin has many testcases 
-and has been rigorously tested, thus, I'm fairly certain that this coin has no major bugs.
+We are a team of blockchain developers that implemented this coin for a secret santa gift 
+exchange. However, we believe its a fun coin to play with! You never know what happens in
+the crpyto world, thus, for the moment we'll remain anonymous as we have customers from 
+the "old" economy and such a coin is not something our clients are looking for. Altough you
+need to have luck to get more coins, this coin has many testcases and has been rigorously 
+tested, so it should behave as expected.
 
 ## Randomness
-
 Creating strong random values onchain is not possible. However, there are several ways how 
 to create weak random values onchain or strong random values offchain.
  
@@ -75,19 +80,32 @@ contract Rnd {
 ```
 
 This randomness is still weak, but not as weak as the first approach. A miner can still not 
-publish a block if the outcome is not in favor. This will give you a small edge over the 
-random value that could destroy certain smart contracts.
+publish a block if the outcome is not in favor. This will give you a small edge 
+(e.g., intead of 50/50 you'll get 50.1/49.9) over the random value that could destroy 
+certain smart contracts.
+
+If your contract uses the first approach, you can expect a miner to set a random value. Thus,
+your contract needs to cope with 100/0. An example could be a card playing game for fun without
+the involvent of assets (playing for fun).
+
+If you use the second approach, the miner can influence the random value in a sense, that it
+might drop a block. Thus, many suggest that the payoff needs to be smaller than 5ETH that
+a miner would get when publishing the block. Thus, your contract needs to cope with something
+like 50.1/49.9. 
+
+One idea was to add or deduct 50% for each transfer, but with no upper limit, and a small
+edge over the random value means that a rogue miner can create coins out of thin air, and
+your contract is broken.
+
+This contract exploits the weak randomness of future blockhashes. The minting is bound to
+wei, so even if a miner gets 50.1/49.9, then the miner has a slightly better exchange rate of
+a bit adove 1:10'000 ELC. During the transfer, you can get a pot, which has on average the
+value of 0.2 ETH, which is way below the 5 ETH a miner would get. However, there is a worst
+case, where for a long period of time every transaction is more than 1h apart. Then the pot
+will be larger. However, we don't believe it will reach 5ETH as otherwise, many transaction
+are necessary.    
 
 
 ### Strong Random Values
 
-The randomness is weak in this contract:
-
-
-If you can guess the random values, you can at most get 2x the coins for your ethers from the
-mint() function. In 10% of the cases in the transfer functions, you get coins from a previous 
-transaction. If you can guess the random number, you can claim the coins from your 
-predecessor, but you cannot create tokens out of thin air. 
-
-Still, its difficult to predict the random number, as the block.timestamp is difficult to predict while 
-the coinbase has a certain probability according to the mining power.
+Oracle, commitment schemes (semi-strong)

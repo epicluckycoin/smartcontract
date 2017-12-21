@@ -12,7 +12,7 @@ contract('EpicLuckyCoin', (accounts) => {
         sender = accounts[0];
         token = await EpicLuckyCoin.new();
         await token.sendTransaction({from: sender, value: web3.toWei(1,"ether")});
-        transferAmount = 100;
+        transferAmount = 10000;
 
         await token.transfer(sender, transferAmount);
         assert.equal(await receiver.sentValue(), 0);
@@ -43,7 +43,7 @@ contract('EpicLuckyCoin', (accounts) => {
             await sendTransaction(params);
 
             balance = await token.balanceOf(receiver.address);
-            assert.equal(balance.add(10).toString(), transferAmount.toString());
+            assert.equal(balance.add(1000).toString(), transferAmount.toString());
         });
 
         it("calls the token fallback function on transfer", async () => {
