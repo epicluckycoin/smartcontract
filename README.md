@@ -9,11 +9,13 @@ you get lucky, you may end up with more tokens than before.
  * Exchange Rate: 1 ETH = 10'000 ELC
  * Decimal Points: 2
  * ERC20 + ERC677 standard
+ * Mainnet address: 0xb74c59d45636a07668e32660badedbfa053d0e95
+ * Link: https://etherscan.io/address/0xb74c59d45636a07668e32660badedbfa053d0e95
  
 Here are the rules minting and transferring rules:
 
 ## Minting
-The exchange rate is 1 ETH = 10'000 ELC, however, with a 50%<sup>*</sup> change you get 
+The exchange rate is 1 ETH = 10'000 ELC, however, with a 50% change you get 
 50% more and if you are unlucky, you get 50% less. E.g. if you buy/mint 1 ETH, you may 
 get 15'000 or 5'000 ELC. For the randomness discussion, see below.
 
@@ -89,7 +91,7 @@ your contract needs to cope with 100/0. An example could be a card playing game 
 the involvent of assets (playing for fun).
 
 If you use the second approach, the miner can influence the random value in a sense, that it
-might drop a block. Thus, many suggest that the payoff needs to be smaller than 5ETH that
+might drop a block. Thus, many suggest that the payoff needs to be smaller than ~3 ETH that
 a miner would get when publishing the block. Thus, your contract needs to cope with something
 like 50.1/49.9. 
 
@@ -100,9 +102,9 @@ your contract is broken.
 This contract exploits the weak randomness of future blockhashes. The minting is bound to
 wei, so even if a miner gets 50.1/49.9, then the miner has a slightly better exchange rate of
 a bit adove 1:10'000 ELC. During the transfer, you can get a pot, which has on average the
-value of 0.2 ETH, which is way below the 5 ETH a miner would get. However, there is a worst
+value of 0.2 ETH, which is way below the ~3 ETH a miner would get. However, there is a worst
 case, where for a long period of time every transaction is more than 1h apart. Then the pot
-will be larger. However, we don't believe it will reach 5ETH as otherwise, many transaction
+will be larger. However, we don't believe it will reach ~3 ETH as otherwise, many transaction
 are necessary.    
 
 
